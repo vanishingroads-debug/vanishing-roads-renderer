@@ -15,22 +15,13 @@ app.get('/', (req, res) => {
 });
 
 app.post('/render', async (req, res) => {
-  const { audio_url, title } = req.body;
+  const { audio_data, title } = req.body;
 
   try {
-    // Download audio from Google Drive
+    // Write audio from Make.com binary data
     const audioPath = path.join('/tmp', 'audio.mp3');
-    const directUrl = audio_url.replace('https://drive.google.com/uc?', 'https://drive.google.com/uc?export=download&');
-    const audioResponse = await axios.get(directUrl, {
-      responseType: 'arraybuffer',
-      timeout: 60000,
-      maxRedirects: 10,
-      headers: { 
-        'User-Agent': 'Mozilla/5.0',
-        'Accept': 'audio/mpeg,*/*'
-      }
-    });
-    fs.writeFileSync(audioPath, audioResponse.data);
+    const audioBuffer = Buffer.from(audio_data);
+    fs.writeFileSync(audioPath, audioBuffer);
 
     // Get background video from Pexels
     const pexelsResponse = await axios.get(
