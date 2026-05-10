@@ -1,11 +1,11 @@
 const express = require('express');
-const axios = require('axios');
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios');
 
 const app = express();
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '200mb' }));
 
 const PORT = process.env.PORT || 3000;
 const PEXELS_API_KEY = process.env.PEXELS_API_KEY;
@@ -15,16 +15,15 @@ app.get('/', (req, res) => {
 });
 
 app.post('/render', async (req, res) => {
-  const { audio_url, title } = req.body;
+  const { audio_data, title } = req.body;
 
   try {
+    // Write audio from base64
     const audioPath = path.join('/tmp', 'audio.mp3');
-    const audioResponse = await axios.get(audio_url, { 
-      responseType: 'arraybuffer',
-      timeout: 60000
-    });
-    fs.writeFileSync(audioPath, audioResponse.data);
+    const audioBuffer = Buffer.from(audio_data, 'base64');
+    fs.writeFileSync(audioPath, audioBuffer);
 
+    // Get background video from Pexels
     const pexelsResponse = await axios.get(
       'https://api.pexels.com/videos/search?query=dark+fog+forest+night&per_page=5&orientation=portrait',
       { headers: { Authorization: PEXELS_API_KEY } }
@@ -36,6 +35,7 @@ app.post('/render', async (req, res) => {
                       videoFiles[0];
     const videoUrl = videoFile.link;
 
+    // Download background video
     const bgPath = path.join('/tmp', 'background.mp4');
     const bgResponse = await axios.get(videoUrl, { 
       responseType: 'arraybuffer',
@@ -44,6 +44,7 @@ app.post('/render', async (req, res) => {
     });
     fs.writeFileSync(bgPath, bgResponse.data);
 
+    // Render final video
     const outputPath = path.join('/tmp', 'output.mp4');
 
     await new Promise((resolve, reject) => {
@@ -62,13 +63,13 @@ app.post('/render', async (req, res) => {
         .output(outputPath)
         .on('end', resolve)
         .on('error', (err, stdout, stderr) => {
-          console.error('FFmpeg error:', err.message);
           console.error('FFmpeg stderr:', stderr);
           reject(err);
         })
         .run();
     });
 
+    // Send back video
     res.setHeader('Content-Type', 'video/mp4');
     res.setHeader('Content-Disposition', `attachment; filename="${title}.mp4"`);
     fs.createReadStream(outputPath).pipe(res);
