@@ -30,9 +30,11 @@ app.post('/render', async (req, res) => {
       { headers: { Authorization: PEXELS_API_KEY } }
     );
 
-    const videoUrl = pexelsResponse.data.videos[0].video_files.find(
-      f => f.quality === 'hd' || f.quality === 'sd'
-    ).link;
+    const videoFiles = pexelsResponse.data.videos[0].video_files;
+const videoFile = videoFiles.find(f => f.quality === 'hd') || 
+                  videoFiles.find(f => f.quality === 'sd') || 
+                  videoFiles[0];
+const videoUrl = videoFile.link;
 
     // Download background video
     const bgPath = path.join('/tmp', 'background.mp4');
