@@ -3,9 +3,10 @@ const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+const multer = require('multer');
 
 const app = express();
-app.use(express.json({ limit: '200mb' }));
+const upload = multer({ dest: '/tmp' });
 
 const PORT = process.env.PORT || 3000;
 const PEXELS_API_KEY = process.env.PEXELS_API_KEY;
@@ -14,16 +15,11 @@ app.get('/', (req, res) => {
   res.send('Vanishing Roads Renderer is running.');
 });
 
-app.post('/render', async (req, res) => {
-  const { audio_data, title } = req.body;
+app.post('/render', upload.single('audio_file'), async (req, res) => {
+  const title = req.body.title;
+  const audioPath = req.file.path;
 
   try {
-    // Write audio from Make.com binary data
-    const audioPath = path.join('/tmp', 'audio.mp3');
-    const audioBuffer = Buffer.from(audio_data);
-    fs.writeFileSync(audioPath, audioBuffer);
-
-    // Get background video from Pexels
     const pexelsResponse = await axios.get(
       'https://api.pexels.com/videos/search?query=dark+fog+forest+night&per_page=5&orientation=portrait',
       { headers: { Authorization: PEXELS_API_KEY } }
@@ -35,7 +31,6 @@ app.post('/render', async (req, res) => {
                       videoFiles[0];
     const videoUrl = videoFile.link;
 
-    // Download background video
     const bgPath = path.join('/tmp', 'background.mp4');
     const bgResponse = await axios.get(videoUrl, { 
       responseType: 'arraybuffer',
@@ -44,7 +39,6 @@ app.post('/render', async (req, res) => {
     });
     fs.writeFileSync(bgPath, bgResponse.data);
 
-    // Render final video
     const outputPath = path.join('/tmp', 'output.mp4');
 
     await new Promise((resolve, reject) => {
@@ -69,7 +63,6 @@ app.post('/render', async (req, res) => {
         .run();
     });
 
-    // Send back video
     res.setHeader('Content-Type', 'video/mp4');
     res.setHeader('Content-Disposition', `attachment; filename="${title}.mp4"`);
     fs.createReadStream(outputPath).pipe(res);
